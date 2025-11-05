@@ -1,0 +1,38 @@
+# Render Blueprint Configuration
+
+services:
+  # Backend Web Service
+  - type: web
+    name: tos-crawler-backend
+    env: python
+    region: us-east
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tos-crawler-db
+          property: connectionString
+      # Add these environment variables in Render dashboard after deployment:
+      # - FIREBASE_PROJECT_ID
+      # - FIREBASE_PRIVATE_KEY
+      # - FIREBASE_CLIENT_EMAIL
+      # - GEMINI_API_KEY
+      # - CORS_ORIGINS 
+      # - REDIS_URL
+
+databases:
+  # PostgreSQL Database
+  - name: tos-crawler-db
+    databaseName: tos_crawler
+    user: tos_crawler_user
+    plan: free
+
+# Note: Redis is not available on Render free tier
+# Currently using Redis from Render free tier (Upstash free tier)
+# https://upstash.com
+
