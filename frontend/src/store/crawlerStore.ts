@@ -64,25 +64,27 @@ export const useCrawlerStore = create<CrawlerStore>()(
           
           console.log('Crawl response:', response) // Debug log
           
-          // API service wraps response in { success: true, data: ... }
-          // Extract the actual crawl data
+          // API service returns ApiResponse<CrawlResponse>
+          // Backend returns CrawlResponse with session_id directly
+          // Extract the crawl data from response.data
           const crawlData = response.success && response.data 
-            ? response.data 
-            : (response.data || response)
+            ? (response.data as any) // Type assertion for API response structure
+            : null
           
           console.log('Crawl data:', crawlData) // Debug log
           
-          // Extract session_id - it might be nested or a UUID object
+          // Extract session_id from backend response
+          // Backend returns { session_id: UUID, url: str, status: str, created_at: datetime }
           let sessionId: string | null = null
           
           if (crawlData) {
+            // Backend returns session_id as UUID object
             if (crawlData.session_id) {
-              // Handle UUID object or string
               sessionId = typeof crawlData.session_id === 'string' 
                 ? crawlData.session_id 
                 : String(crawlData.session_id)
             } else if (crawlData.id) {
-              // Alternative field name
+              // Fallback to id field
               sessionId = typeof crawlData.id === 'string'
                 ? crawlData.id
                 : String(crawlData.id)
@@ -95,13 +97,13 @@ export const useCrawlerStore = create<CrawlerStore>()(
             const newSession: CrawlSession = {
               id: sessionId,
               user_id: 'current-user', // This should come from auth context
-              url: crawlData.url || request.url,
+              url: crawlData?.url || request.url,
               document_types: ['tos', 'privacy'], // Map back from backend enum
-              status: crawlData.status || 'pending',
+              status: crawlData?.status || 'pending',
               progress: 0,
               documents_found: 0,
               documents_analyzed: 0,
-              created_at: crawlData.created_at || new Date().toISOString(),
+              created_at: crawlData?.created_at || new Date().toISOString(),
               documents: []
             }
             
@@ -147,8 +149,9 @@ export const useCrawlerStore = create<CrawlerStore>()(
           const response = await api.getCrawlStatus(sessionId)
           
           if (response.success && response.data) {
-            // Backend returns CrawlStatusResponse with 'id' field (not 'session_id')
-            const sessionData = response.data
+            // Backend returns CrawlStatusResponse with 'id' field
+            // Type assertion to access properties safely
+            const sessionData = response.data as any
             
             if (sessionData) {
               // Map backend CrawlStatusResponse format to frontend CrawlSession format
@@ -196,9 +199,12 @@ export const useCrawlerStore = create<CrawlerStore>()(
             // Handle both response formats for compatibility
             let sessionsList: CrawlSession[] = []
             
-            if (Array.isArray(response.data)) {
-              // Backend returns array directly
-              sessionsList = response.data.map((session: any) => ({
+            // Type assertion to handle API response structure
+            const historyData = response.data as any
+            
+            if (Array.isArray(historyData)) {
+              // Backend returns array directly (List[CrawlStatusResponse])
+              sessionsList = historyData.map((session: any) => ({
                 id: String(session.id || session.session_id),
                 user_id: 'current-user', // User is authenticated, sessions are filtered by backend
                 url: session.url || '',
@@ -213,12 +219,12 @@ export const useCrawlerStore = create<CrawlerStore>()(
                 error_message: session.error_message,
                 documents: []
               }))
-            } else if (response.data.data?.sessions) {
+            } else if (historyData.data?.sessions) {
               // Wrapped format (if pagination wrapper exists)
-              sessionsList = response.data.data.sessions
-            } else if (response.data.sessions) {
+              sessionsList = historyData.data.sessions
+            } else if (historyData.sessions) {
               // Alternative wrapped format
-              sessionsList = response.data.sessions
+              sessionsList = historyData.sessions
             }
             
             set({
