@@ -109,7 +109,7 @@ export const useCrawlerStore = create<CrawlerStore>()(
             
             console.log('Created session:', newSession) // Debug log
             
-            set((state) => ({
+            set((state: CrawlerStore) => ({
               sessions: [newSession, ...state.sessions],
               currentSession: newSession,
               isLoading: false,
@@ -170,7 +170,7 @@ export const useCrawlerStore = create<CrawlerStore>()(
                 documents: [] // Not in status response
               }
               
-              set((state) => ({
+              set((state: CrawlerStore) => ({
                 sessions: state.sessions
                   .map(session => 
                     session && session.id === sessionId ? updatedSession : session
@@ -268,13 +268,13 @@ export const useCrawlerStore = create<CrawlerStore>()(
       },
 
       addSession: (session: CrawlSession) => {
-        set((state) => ({
+        set((state: CrawlerStore) => ({
           sessions: [session, ...state.sessions]
         }))
       },
 
       updateSession: (sessionId: string, updates: Partial<CrawlSession>) => {
-        set((state) => ({
+        set((state: CrawlerStore) => ({
           sessions: state.sessions.map(session => 
             session.id === sessionId ? { ...session, ...updates } : session
           ),
@@ -305,9 +305,9 @@ export const useCrawlerStore = create<CrawlerStore>()(
     }),
     {
       name: 'crawler-storage',
-      partialize: (state) => ({
+      partialize: (state: CrawlerStore) => ({
         // Only persist valid sessions
-        sessions: state.sessions.filter(s => s && s.id && s.url),
+        sessions: state.sessions.filter((s: CrawlSession) => s && s.id && s.url),
         documentTypes: state.documentTypes
       }),
       // Migration to clean up corrupted data
