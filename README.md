@@ -33,7 +33,3 @@ This application allows users to:
   - Search history tracking
   - Document favorites
   - Report downloads (planning to implement)
-
-### Installation
-
-Currently have to open through your local from http://localhost:3000
