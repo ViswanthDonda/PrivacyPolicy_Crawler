@@ -12,14 +12,14 @@ export const generatePDFReport = (data: PDFData): void => {
   const { analysis, document, sessionUrl } = data
   const doc = new jsPDF()
   
-  // Colors
-  const primaryColor = [41, 128, 185] // Blue
-  const successColor = [46, 204, 113] // Green
-  const warningColor = [241, 196, 15] // Yellow
-  const dangerColor = [231, 76, 60] // Red
+  // Colors (using tuple types for TypeScript compatibility)
+  const primaryColor: [number, number, number] = [41, 128, 185] // Blue
+  const successColor: [number, number, number] = [46, 204, 113] // Green
+  const warningColor: [number, number, number] = [241, 196, 15] // Yellow
+  const dangerColor: [number, number, number] = [231, 76, 60] // Red
   
   // Helper function to get risk color
-  const getRiskColor = (score: number): number[] => {
+  const getRiskColor = (score: number): [number, number, number] => {
     if (score >= 7) return dangerColor
     if (score >= 4) return warningColor
     return successColor
@@ -101,9 +101,9 @@ export const generatePDFReport = (data: PDFData): void => {
   doc.text('Summary', 14, yPosition)
   yPosition += 10
   
-  // Handle summary fields - check both possible field names
-  const summary100 = analysis.summary_100 || analysis.summary_100_words || ''
-  const summarySentence = analysis.summary_sentence || analysis.summary_one_sentence || ''
+  // Handle summary fields - use correct property names from AnalysisResult type
+  const summary100 = analysis.summary_100 || ''
+  const summarySentence = analysis.summary_sentence || ''
   
   if (summary100) {
     doc.setFontSize(11)
