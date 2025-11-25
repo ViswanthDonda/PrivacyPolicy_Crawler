@@ -7,8 +7,9 @@ import SimpleAnalysisDisplay from '@/components/analysis/SimpleAnalysisDisplay'
 import { Card, CardContent, CardHeader, CardTitle, Spinner } from '@/components/ui'
 import { useCrawler } from '@/store/crawlerStore'
 import { CrawlSession } from '@/types'
-import { ArrowLeft, RefreshCw, FileText } from 'lucide-react'
+import { ArrowLeft, RefreshCw, FileText, Download } from 'lucide-react'
 import { apiService } from '@/services'
+import { generatePDFReport } from '@/utils/pdfGenerator'
 
 const CrawlResultsPage: React.FC = () => {
   const router = useRouter()
@@ -208,6 +209,45 @@ const CrawlResultsPage: React.FC = () => {
                     
                     {analysis ? (
                       <div className="mt-4">
+                        <div className="mb-4 flex justify-end">
+                          <button
+                            onClick={() => {
+                              // Convert analysis to match AnalysisResult type
+                              const analysisResult = {
+                                document_id: document.document_id || '',
+                                summary_100: analysis.summary_100_words || '',
+                                summary_sentence: analysis.summary_one_sentence || '',
+                                word_frequency: analysis.word_frequency || {},
+                                measurements: analysis.measurements || {},
+                                created_at: analysis.created_at || new Date().toISOString()
+                              }
+                              
+                              // Convert document to match Document type
+                              const docForPDF = {
+                                id: document.document_id || '',
+                                url: document.url || '',
+                                domain: document.url ? new URL(document.url).hostname : '',
+                                document_type: (document.document_type === 'terms_of_service' ? 'tos' : 'privacy') as 'tos' | 'privacy',
+                                title: document.title || '',
+                                content: '',
+                                word_count: document.word_count || 0,
+                                sentence_count: analysis.measurements?.sentence_count || 0,
+                                created_at: document.created_at || new Date().toISOString(),
+                                updated_at: document.updated_at || new Date().toISOString()
+                              }
+                              
+                              generatePDFReport({
+                                analysis: analysisResult,
+                                document: docForPDF,
+                                sessionUrl: document.url
+                              })
+                            }}
+                            className="flex items-center space-x-2 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                          >
+                            <Download className="h-4 w-4" />
+                            <span>Download PDF Report</span>
+                          </button>
+                        </div>
                         <SimpleAnalysisDisplay analysis={analysis} />
                       </div>
                     ) : (
