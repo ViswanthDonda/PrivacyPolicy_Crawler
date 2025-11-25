@@ -5,6 +5,7 @@ import WordFrequencyChart from './WordFrequencyChart'
 import MeasurementsTable from './MeasurementsTable'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Download, Star, Share2, FileText } from 'lucide-react'
+import { generatePDFReport } from '@/utils/pdfGenerator'
 
 interface AnalysisResultsProps {
   analysis: AnalysisResult
@@ -28,23 +29,26 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
     if (onDownload) {
       onDownload(format)
     } else {
-      // Create download blob from analysis data
-      const data = format === 'json' 
-        ? JSON.stringify({ analysis, document: doc }, null, 2)
-        : 'PDF download not implemented yet'
-      
-      const blob = new Blob([data], { 
-        type: format === 'json' ? 'application/json' : 'application/pdf' 
-      })
-      
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `analysis-${doc.id}.${format}`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
+      if (format === 'pdf') {
+        // Generate PDF report
+        generatePDFReport({
+          analysis,
+          document: doc,
+          sessionUrl: doc.url
+        })
+      } else {
+        // JSON download
+        const data = JSON.stringify({ analysis, document: doc }, null, 2)
+        const blob = new Blob([data], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `analysis-${doc.id}.json`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+      }
     }
   }
 
