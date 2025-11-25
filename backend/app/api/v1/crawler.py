@@ -17,6 +17,7 @@ from app.schemas.analysis import AnalysisResponse, DocumentAnalysisResponse, Ses
 from app.database.base import get_db
 from app.services.crawler_service import CrawlerService
 from app.services.gemini_service import GeminiService
+from app.services.global_document_service import GlobalDocumentService
 from sqlalchemy.orm import Session
 import asyncio
 import logging
@@ -45,26 +46,34 @@ async def crawl_task(session_id: UUID, url: str, user_id: UUID):
             session.status = SessionStatus.PROCESSING
             db.commit()
         
-        # Run crawler
-        async with CrawlerService() as crawler:
-            result = await crawler.crawl_url(url)
+        # Check global cache first
+        cached_docs = GlobalDocumentService.find_cached_documents(
+            db=db,
+            base_url=url,
+            document_types=['privacy_policy', 'terms_of_service', 'privacy', 'tos']
+        )
         
-        # Store documents
         document_count = 0
         analyzed_count = 0
         documents_to_analyze = []
+        cache_hit = False
         
-        for doc_type, docs in result.get('documents', {}).items():
-            for doc in docs:
+        if cached_docs:
+            logger.info(f"Found {len(cached_docs)} cached documents for {url} - using cache")
+            cache_hit = True
+            
+            # Use cached documents
+            for cached_doc in cached_docs:
+                # Create user-specific document from cached data
                 document = Document(
                     user_id=user_id,
                     session_id=session_id,
-                    url=doc['url'],
-                    document_type=doc['document_type'],
-                    title=doc.get('title'),
-                    raw_text=doc['text'],
-                    text_hash=doc['text_hash'],
-                    word_count=doc['word_count']
+                    url=cached_doc.document_url,
+                    document_type=cached_doc.document_type,
+                    title=cached_doc.title,
+                    raw_text=cached_doc.raw_text,
+                    text_hash=cached_doc.text_hash,
+                    word_count=cached_doc.word_count
                 )
                 db.add(document)
                 db.flush()  # Get document ID
@@ -72,15 +81,66 @@ async def crawl_task(session_id: UUID, url: str, user_id: UUID):
                 # Collect documents for analysis
                 documents_to_analyze.append({
                     'document': document,
-                    'text': doc['text'],
-                    'url': doc['url'],
-                    'doc_type': doc['document_type']
+                    'text': cached_doc.raw_text,
+                    'url': cached_doc.document_url,
+                    'doc_type': cached_doc.document_type,
+                    'from_cache': True
                 })
                 
                 document_count += 1
+        else:
+            logger.info(f"No cached documents found for {url} - crawling fresh")
+            # No cache - proceed with normal crawl
+            async with CrawlerService() as crawler:
+                result = await crawler.crawl_url(url)
+            
+            # Store documents in global cache and create user documents
+            for doc_type, docs in result.get('documents', {}).items():
+                for doc in docs:
+                    # Store in global cache
+                    try:
+                        GlobalDocumentService.store_document(
+                            db=db,
+                            document_url=doc['url'],
+                            document_type=doc['document_type'],
+                            raw_text=doc['text'],
+                            title=doc.get('title'),
+                            word_count=doc['word_count']
+                        )
+                    except Exception as cache_error:
+                        logger.warning(f"Error storing in global cache: {cache_error}")
+                        # Continue even if cache storage fails
+                    
+                    # Create user-specific document
+                    document = Document(
+                        user_id=user_id,
+                        session_id=session_id,
+                        url=doc['url'],
+                        document_type=doc['document_type'],
+                        title=doc.get('title'),
+                        raw_text=doc['text'],
+                        text_hash=doc['text_hash'],
+                        word_count=doc['word_count']
+                    )
+                    db.add(document)
+                    db.flush()  # Get document ID
+                    
+                    # Collect documents for analysis
+                    documents_to_analyze.append({
+                        'document': document,
+                        'text': doc['text'],
+                        'url': doc['url'],
+                        'doc_type': doc['document_type'],
+                        'from_cache': False
+                    })
+                    
+                    document_count += 1
         
         # Commit documents first
         db.commit()
+        
+        if cache_hit:
+            logger.info(f"Using {len(cached_docs)} cached documents - saved crawling time")
         
         # Analyze documents with Gemini
         gemini_service = GeminiService()
