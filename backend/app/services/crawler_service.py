@@ -82,7 +82,17 @@ class CrawlerService:
             }
             
         except Exception as e:
-            logger.error(f"Error crawling {url}: {e}")
+            error_type = type(e).__name__
+            error_msg = str(e)
+            logger.error(f"Error crawling {url}")
+            logger.error(f"  Error Type: {error_type}")
+            logger.error(f"  Error Message: {error_msg}")
+            logger.error(f"  Error Details: {repr(e)}")
+            
+            # Log traceback for crawl errors
+            import traceback
+            logger.error(f"  Traceback: {traceback.format_exc()}")
+            
             raise
     
     async def _fetch_page(self, url: str) -> tuple[str, Optional[str]]:
@@ -96,19 +106,86 @@ class CrawlerService:
             Tuple of (html_content, page_title)
         """
         try:
+            logger.info(f"Attempting to fetch: {url}")
+            logger.debug(f"Request headers: User-Agent={self.user_agent}, Timeout={self.timeout}")
+            
             async with self.session.get(url) as response:
-                response.raise_for_status()
+                # Log response details
+                logger.info(f"Response received for {url}: Status={response.status}, Headers={dict(response.headers)}")
+                
+                # Check status code
+                if response.status >= 400:
+                    # Try to get error response body for debugging
+                    try:
+                        error_body = await response.text()
+                        logger.error(f"HTTP Error {response.status} for {url}")
+                        logger.error(f"Response headers: {dict(response.headers)}")
+                        logger.error(f"Response body (first 500 chars): {error_body[:500]}")
+                    except Exception as body_error:
+                        logger.error(f"Could not read error response body: {body_error}")
+                    
+                    response.raise_for_status()  # This will raise HTTPException
+                
+                # Success - log content info
                 html_content = await response.text()
+                content_length = len(html_content)
+                logger.info(f"Successfully fetched {url}: Content length={content_length} bytes, Status={response.status}")
                 
                 # Try to extract title quickly
                 soup = parse_html(html_content)
                 page_title = get_page_title(soup)
                 
+                if page_title:
+                    logger.debug(f"Page title extracted: {page_title}")
+                
                 return html_content, page_title
                 
+        except aiohttp.ClientError as e:
+            # Network/HTTP client errors
+            error_type = type(e).__name__
+            error_msg = str(e)
+            logger.error(f"HTTP Client Error fetching {url}")
+            logger.error(f"  Error Type: {error_type}")
+            logger.error(f"  Error Message: {error_msg}")
+            logger.error(f"  Error Details: {repr(e)}")
+            
+            # Check for specific error types
+            if isinstance(e, aiohttp.ClientResponseError):
+                logger.error(f"  HTTP Status: {e.status}")
+                logger.error(f"  Request Info: {e.request_info}")
+                logger.error(f"  History: {e.history}")
+            elif isinstance(e, aiohttp.ClientConnectorError):
+                logger.error(f"  Connection Error - Cannot connect to host")
+                logger.error(f"  Connection Details: {e.os_error if hasattr(e, 'os_error') else 'N/A'}")
+            elif isinstance(e, aiohttp.ClientTimeout):
+                logger.error(f"  Timeout Error - Request took longer than {self.timeout.total} seconds")
+            elif isinstance(e, aiohttp.ServerTimeoutError):
+                logger.error(f"  Server Timeout - Server did not respond in time")
+            
+            raise ValueError(f"Failed to fetch page: {error_type}: {error_msg}")
+            
+        except asyncio.TimeoutError as e:
+            logger.error(f"Timeout Error fetching {url}")
+            logger.error(f"  Error Type: {type(e).__name__}")
+            logger.error(f"  Error Message: {str(e)}")
+            logger.error(f"  Timeout Settings: Total={self.timeout.total}s, Connect={self.timeout.connect}s")
+            raise ValueError(f"Failed to fetch page: Timeout after {self.timeout.total} seconds")
+            
         except Exception as e:
-            logger.error(f"Error fetching {url}: {e}")
-            raise ValueError(f"Failed to fetch page: {str(e)}")
+            # Catch-all for any other exceptions
+            error_type = type(e).__name__
+            error_msg = str(e)
+            logger.error(f"Unexpected Error fetching {url}")
+            logger.error(f"  Error Type: {error_type}")
+            logger.error(f"  Error Message: {error_msg}")
+            logger.error(f"  Error Details: {repr(e)}")
+            logger.error(f"  Error Args: {e.args if hasattr(e, 'args') else 'N/A'}")
+            
+            # Log traceback for unexpected errors
+            import traceback
+            logger.error(f"  Traceback: {traceback.format_exc()}")
+            
+            raise ValueError(f"Failed to fetch page: {error_type}: {error_msg}")
     
     async def _process_documents(self, document_links: Dict[str, List[Dict]]) -> Dict[str, List[Dict]]:
         """
@@ -131,7 +208,12 @@ class CrawlerService:
                     if doc:
                         documents[doc_type].append(doc)
                 except Exception as e:
-                    logger.error(f"Error processing document {link['url']}: {e}")
+                    error_type = type(e).__name__
+                    error_msg = str(e)
+                    logger.error(f"Error processing document {link['url']} (type: {doc_type})")
+                    logger.error(f"  Error Type: {error_type}")
+                    logger.error(f"  Error Message: {error_msg}")
+                    logger.error(f"  Error Details: {repr(e)}")
                     continue
         
         return documents
@@ -179,7 +261,17 @@ class CrawlerService:
             }
             
         except Exception as e:
-            logger.error(f"Error processing document {url}: {e}")
+            error_type = type(e).__name__
+            error_msg = str(e)
+            logger.error(f"Error processing document {url} (type: {doc_type})")
+            logger.error(f"  Error Type: {error_type}")
+            logger.error(f"  Error Message: {error_msg}")
+            logger.error(f"  Error Details: {repr(e)}")
+            
+            # Log traceback for processing errors
+            import traceback
+            logger.error(f"  Traceback: {traceback.format_exc()}")
+            
             return None
     
     def _normalize_url(self, url: str) -> str:
