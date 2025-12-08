@@ -4,6 +4,7 @@ from typing import Optional
 from app.services.auth_service import verify_firebase_token
 from app.database.base import get_db
 from app.models.user import User
+from app.config import settings
 from sqlalchemy.orm import Session
 
 async def get_current_user(
@@ -42,6 +43,11 @@ async def get_current_user(
             detail=str(e)
         )
     
+    # Get admin emails from config
+    admin_emails = [email.strip().lower() for email in settings.ADMIN_EMAILS.split(",") if email.strip()]
+    user_email = firebase_user["email"].lower() if firebase_user.get("email") else ""
+    is_admin = user_email in admin_emails
+    
     # Get or create user in database
     user = db.query(User).filter(
         User.firebase_uid == firebase_user["firebase_uid"]
@@ -53,11 +59,18 @@ async def get_current_user(
             firebase_uid=firebase_user["firebase_uid"],
             email=firebase_user["email"],
             display_name=firebase_user.get("name"),
-            username=firebase_user.get("email", "").split("@")[0] if firebase_user.get("email") else None
+            username=firebase_user.get("email", "").split("@")[0] if firebase_user.get("email") else None,
+            is_admin=is_admin
         )
         db.add(user)
         db.commit()
         db.refresh(user)
+    else:
+        # Update admin status if email is in admin list (allows promoting existing users)
+        if is_admin and not user.is_admin:
+            user.is_admin = True
+            db.commit()
+            db.refresh(user)
     
     return user
 
