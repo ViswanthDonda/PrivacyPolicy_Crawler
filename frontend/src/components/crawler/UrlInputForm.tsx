@@ -1,17 +1,46 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { Button, Input, Card, CardContent } from '@/components/ui'
 import { useCrawler, useCrawlerActions, useDocumentTypes } from '@/store/crawlerStore'
+import { useAuthStore } from '@/store/authStore'
 import { CrawlRequest } from '@/types'
 import { Globe, Search, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { apiService } from '@/services'
 
 const UrlInputForm: React.FC = () => {
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['tos', 'privacy'])
   const [forceRefresh, setForceRefresh] = useState<boolean>(false)
+  const [isAdmin, setIsAdmin] = useState<boolean>(false)
   const { isLoading, error } = useCrawler()
   const { startCrawl } = useCrawlerActions()
   const documentTypes = useDocumentTypes()
+  const { user } = useAuthStore()
+  
+  // Fetch current user info to check admin status
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const response = await apiService.getCurrentUser()
+        if (response.success && response.data) {
+          setIsAdmin((response.data as any).is_admin || false)
+        }
+      } catch (error) {
+        // If user store has is_admin, use that as fallback
+        if (user?.is_admin !== undefined) {
+          setIsAdmin(user.is_admin)
+        }
+      }
+    }
+    
+    // Check user store first
+    if (user?.is_admin !== undefined) {
+      setIsAdmin(user.is_admin)
+    } else {
+      // Fetch from API if not in store
+      fetchUserInfo()
+    }
+  }, [user])
   
   const {
     register,
@@ -150,22 +179,24 @@ const UrlInputForm: React.FC = () => {
           )}
 
           <div className="flex items-center justify-between pt-4">
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="force-refresh"
-                checked={forceRefresh}
-                onChange={(e) => setForceRefresh(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-800"
-              />
-              <label 
-                htmlFor="force-refresh" 
-                className="text-sm text-gray-300 cursor-pointer"
-                title="Force fresh crawl (bypasses cache - for testing)"
-              >
-                Force Fresh Crawl
-              </label>
-            </div>
+            {isAdmin && (
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="force-refresh"
+                  checked={forceRefresh}
+                  onChange={(e) => setForceRefresh(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-800"
+                />
+                <label 
+                  htmlFor="force-refresh" 
+                  className="text-sm text-gray-300 cursor-pointer"
+                  title="Force fresh crawl (Admin Only - updates global cache for all users)"
+                >
+                  Force Fresh Crawl (Admin Only)
+                </label>
+              </div>
+            )}
             <Button
               type="submit"
               variant="primary"
@@ -182,8 +213,8 @@ const UrlInputForm: React.FC = () => {
             <p>• Analysis typically takes 30-60 seconds</p>
             <p>• We'll search for TOS and Privacy Policy links</p>
             <p>• Results will be saved to your account</p>
-            {forceRefresh && (
-              <p className="text-yellow-400 mt-2">⚠️ Force refresh enabled - will bypass cache and crawl fresh</p>
+            {isAdmin && forceRefresh && (
+              <p className="text-yellow-400 mt-2">⚠️ Force refresh enabled - will update global cache for all users</p>
             )}
           </div>
         </form>

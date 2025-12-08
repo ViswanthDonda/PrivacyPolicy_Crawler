@@ -4,6 +4,7 @@ export interface User {
   username?: string
   displayName?: string
   firebase_uid?: string
+  is_admin?: boolean
   created_at: string
   updated_at: string
   is_active: boolean

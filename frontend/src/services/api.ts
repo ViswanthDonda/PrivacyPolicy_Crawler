@@ -13,7 +13,10 @@ import {
   FavoritesResponse,
   FavoriteActionResponse,
   DocumentSearchResponse,
-  ApiResponse
+  ApiResponse,
+  GlobalDocumentSearchResponse,
+  DeleteDocumentRequest,
+  DeleteDocumentResponse
 } from '@/types'
 
 class ApiService {
@@ -277,6 +280,13 @@ class ApiService {
     })
   }
 
+  async getCurrentUser(): Promise<ApiResponse<any>> {
+    return this.request<any>({
+      method: 'GET',
+      url: '/users/me'
+    })
+  }
+
   async deleteCrawlSession(sessionId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -391,6 +401,34 @@ class ApiService {
     return this.request<ApiResponse>({
       method: 'GET',
       url: '/health'
+    })
+  }
+
+  // Admin methods
+  async searchGlobalDocuments(params: {
+    search?: string
+    page?: number
+    limit?: number
+  }): Promise<ApiResponse<GlobalDocumentSearchResponse>> {
+    return this.request<GlobalDocumentSearchResponse>({
+      method: 'GET',
+      url: '/admin/global-documents',
+      params
+    })
+  }
+
+  async deleteGlobalDocument(documentId: string): Promise<ApiResponse<DeleteDocumentResponse>> {
+    return this.request<DeleteDocumentResponse>({
+      method: 'DELETE',
+      url: `/admin/global-documents/${documentId}`
+    })
+  }
+
+  async deleteGlobalDocumentByUrl(documentUrl: string): Promise<ApiResponse<DeleteDocumentResponse>> {
+    return this.request<DeleteDocumentResponse>({
+      method: 'POST',
+      url: '/admin/global-documents/delete-by-url',
+      data: { document_url: documentUrl }
     })
   }
 }
