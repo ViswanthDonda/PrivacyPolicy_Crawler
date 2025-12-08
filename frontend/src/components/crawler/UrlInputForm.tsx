@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 
 const UrlInputForm: React.FC = () => {
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['tos', 'privacy'])
+  const [forceRefresh, setForceRefresh] = useState<boolean>(false)
   const { isLoading, error } = useCrawler()
   const { startCrawl } = useCrawlerActions()
   const documentTypes = useDocumentTypes()
@@ -35,7 +36,7 @@ const UrlInputForm: React.FC = () => {
     const request: CrawlRequest = {
       url: data.url,
       document_types: selectedTypes as ('tos' | 'privacy')[],
-      force_refresh: false
+      force_refresh: forceRefresh
     }
 
     const success = await startCrawl(request)
@@ -148,7 +149,23 @@ const UrlInputForm: React.FC = () => {
             </div>
           )}
 
-          <div className="flex items-center justify-end pt-4">
+          <div className="flex items-center justify-between pt-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="force-refresh"
+                checked={forceRefresh}
+                onChange={(e) => setForceRefresh(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-800"
+              />
+              <label 
+                htmlFor="force-refresh" 
+                className="text-sm text-gray-300 cursor-pointer"
+                title="Force fresh crawl (bypasses cache - for testing)"
+              >
+                Force Fresh Crawl
+              </label>
+            </div>
             <Button
               type="submit"
               variant="primary"
@@ -165,6 +182,9 @@ const UrlInputForm: React.FC = () => {
             <p>• Analysis typically takes 30-60 seconds</p>
             <p>• We'll search for TOS and Privacy Policy links</p>
             <p>• Results will be saved to your account</p>
+            {forceRefresh && (
+              <p className="text-yellow-400 mt-2">⚠️ Force refresh enabled - will bypass cache and crawl fresh</p>
+            )}
           </div>
         </form>
       </CardContent>
