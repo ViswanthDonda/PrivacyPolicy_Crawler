@@ -21,6 +21,7 @@ class UserResponse(UserBase):
     """User response schema"""
     id: UUID
     firebase_uid: str
+    is_admin: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
 
