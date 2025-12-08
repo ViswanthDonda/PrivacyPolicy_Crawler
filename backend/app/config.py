@@ -27,8 +27,11 @@ class Settings(BaseSettings):
     FIREBASE_PRIVATE_KEY: str = ""
     FIREBASE_CLIENT_EMAIL: str = ""
     
-    # Google Gemini API
+    # Google Gemini API (backup only - use with extreme caution)
     GEMINI_API_KEY: str = ""
+    
+    # Groq API (primary analysis service)
+    GROQ_API_KEY: str = ""
     
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000"
