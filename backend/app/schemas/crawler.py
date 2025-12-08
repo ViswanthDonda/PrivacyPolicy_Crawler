@@ -29,6 +29,10 @@ class CrawlRequest(BaseModel):
         default=[DocumentType.PRIVACY, DocumentType.TOS],
         description="Types of documents to find"
     )
+    force_refresh: bool = Field(
+        default=False,
+        description="Force fresh crawl even if documents exist in global cache"
+    )
 
 
 class CrawlResponse(BaseModel):
