@@ -5,6 +5,7 @@ from app.models.document import Document
 from app.models.analysis_result import AnalysisResult
 from app.models.user_favorite import UserFavorite
 from app.models.global_document import GlobalDocument
+from app.models.global_analysis_result import GlobalAnalysisResult
 
 __all__ = [
     "User",
@@ -12,6 +13,7 @@ __all__ = [
     "Document",
     "AnalysisResult",
     "UserFavorite",
-    "GlobalDocument"
+    "GlobalDocument",
+    "GlobalAnalysisResult"
 ]
 
