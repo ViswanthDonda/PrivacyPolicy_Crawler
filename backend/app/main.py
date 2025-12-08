@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings, CORS_ORIGINS
-from app.api.v1 import auth, crawler, documents, users
+from app.api.v1 import auth, crawler, documents, users, admin
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -43,6 +43,7 @@ app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["
 app.include_router(crawler.router, prefix=f"{settings.API_V1_PREFIX}/crawler", tags=["Crawler"])
 app.include_router(documents.router, prefix=f"{settings.API_V1_PREFIX}/documents", tags=["Documents"])
 app.include_router(users.router, prefix=f"{settings.API_V1_PREFIX}/users", tags=["Users"])
+app.include_router(admin.router, prefix=f"{settings.API_V1_PREFIX}/admin", tags=["Admin"])
 
 if __name__ == "__main__":
     import uvicorn

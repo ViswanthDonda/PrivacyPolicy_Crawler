@@ -86,6 +86,7 @@ class GlobalDocumentService:
         document_url: str,
         document_type: str,
         raw_text: str,
+        base_url: str,
         title: Optional[str] = None,
         word_count: Optional[int] = None
     ) -> GlobalDocument:
@@ -97,6 +98,7 @@ class GlobalDocumentService:
             document_url: Full document URL
             document_type: Type of document
             raw_text: Document text content
+            base_url: Base URL from original crawl (normalized)
             title: Document title
             word_count: Word count
         
@@ -104,7 +106,8 @@ class GlobalDocumentService:
             GlobalDocument object
         """
         try:
-            base_url = GlobalDocumentService.normalize_base_url(document_url)
+            # Use provided base_url (from original crawl) instead of extracting from document_url
+            normalized_base = GlobalDocumentService.normalize_base_url(base_url)
             text_hash = calculate_text_hash(raw_text)
             
             # Check if document exists
@@ -137,7 +140,7 @@ class GlobalDocumentService:
             else:
                 # New document
                 new_doc = GlobalDocument(
-                    base_url=base_url,
+                    base_url=normalized_base,
                     document_url=document_url,
                     document_type=document_type,
                     title=title,
@@ -177,4 +180,93 @@ class GlobalDocumentService:
         except Exception as e:
             logger.error(f"Error marking document as stale: {e}")
             db.rollback()
+    
+    @staticmethod
+    def search_documents(
+        db: Session,
+        search_query: Optional[str] = None,
+        page: int = 1,
+        limit: int = 20
+    ) -> tuple[List[GlobalDocument], int]:
+        """
+        Search global documents by URL (base_url or document_url)
+        
+        Args:
+            db: Database session
+            search_query: Search term (searches in base_url and document_url)
+            page: Page number (1-indexed)
+            limit: Number of results per page
+        
+        Returns:
+            Tuple of (list of documents, total count)
+        """
+        try:
+            from sqlalchemy import or_
+            
+            query = db.query(GlobalDocument)
+            
+            if search_query:
+                # Search in both base_url and document_url
+                search_pattern = f"%{search_query.lower()}%"
+                query = query.filter(
+                    or_(
+                        GlobalDocument.base_url.ilike(search_pattern),
+                        GlobalDocument.document_url.ilike(search_pattern)
+                    )
+                )
+            
+            # Get total count
+            total = query.count()
+            
+            # Apply pagination
+            offset = (page - 1) * limit
+            documents = query.order_by(GlobalDocument.last_crawled.desc()).offset(offset).limit(limit).all()
+            
+            return documents, total
+            
+        except Exception as e:
+            logger.error(f"Error searching documents: {e}")
+            return [], 0
+    
+    @staticmethod
+    def delete_document(
+        db: Session,
+        document_id: Optional[str] = None,
+        document_url: Optional[str] = None
+    ) -> bool:
+        """
+        Delete a global document and its analysis (cascade)
+        
+        Args:
+            db: Database session
+            document_id: Document ID (UUID)
+            document_url: Document URL (alternative to document_id)
+        
+        Returns:
+            True if deleted, False if not found
+        """
+        try:
+            if document_id:
+                doc = db.query(GlobalDocument).filter(GlobalDocument.id == document_id).first()
+            elif document_url:
+                doc = db.query(GlobalDocument).filter(GlobalDocument.document_url == document_url).first()
+            else:
+                logger.error("Either document_id or document_url must be provided")
+                return False
+            
+            if doc:
+                document_url_deleted = doc.document_url
+                # Delete document (analysis will be cascade deleted)
+                db.delete(doc)
+                db.commit()
+                logger.info(f"Deleted global document: {document_url_deleted}")
+                return True
+            else:
+                logger.warning(f"Document not found for deletion (id={document_id}, url={document_url})")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error deleting document: {e}")
+            db.rollback()
+            return False
 

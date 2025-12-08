@@ -15,9 +15,10 @@ class User(Base):
     email = Column(String(255), nullable=False)
     username = Column(String(100))
     display_name = Column(String(255))
+    is_admin = Column(Boolean, default=False, nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     def __repr__(self):
-        return f"<User(id={self.id}, firebase_uid={self.firebase_uid}, email={self.email})>"
+        return f"<User(id={self.id}, firebase_uid={self.firebase_uid}, email={self.email}, is_admin={self.is_admin})>"
 

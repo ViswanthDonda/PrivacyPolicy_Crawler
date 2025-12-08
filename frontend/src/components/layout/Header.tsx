@@ -1,8 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { Button } from '@/components/ui'
 import { useAuth } from '@/hooks/useAuth'
+import { useAuthStore } from '@/store/authStore'
+import { apiService } from '@/services'
 import {
   Menu,
   X,
@@ -11,15 +13,37 @@ import {
   Key,
   Bookmark,
   ChevronDown,
-  History
+  History,
+  Shield
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const Header: React.FC = () => {
   const router = useRouter()
   const { user, userProfile, loading, signOut } = useAuth()
+  const { user: storeUser } = useAuthStore()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  // Check admin status
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (storeUser?.is_admin) {
+        setIsAdmin(true)
+      } else if (user) {
+        try {
+          const response = await apiService.getCurrentUser()
+          if (response.success && response.data) {
+            setIsAdmin((response.data as any).is_admin || false)
+          }
+        } catch (error) {
+          // Ignore errors
+        }
+      }
+    }
+    checkAdmin()
+  }, [user, storeUser])
 
   // Handle user logout and redirect to home
   const handleLogout = async () => {
@@ -95,6 +119,23 @@ const Header: React.FC = () => {
             {/* User Menu */}
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
+                {/* Admin Link */}
+                {isAdmin && (
+                  <Link
+                    href="/admin/global-documents"
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                      router.pathname?.startsWith('/admin')
+                        ? 'text-white bg-gray-800/50 border border-gray-600'
+                        : 'text-gray-300 hover:text-white hover:bg-gray-800/50'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Shield className="h-4 w-4" />
+                      <span>Admin</span>
+                    </div>
+                  </Link>
+                )}
+                
                 {/* History Link */}
                 <Link
                   href="/history"
