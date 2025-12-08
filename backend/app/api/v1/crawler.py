@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def crawl_task(session_id: UUID, url: str, user_id: UUID):
+async def crawl_task(session_id: UUID, url: str, user_id: UUID, force_refresh: bool = False):
     """
     Background task for crawling and analysis (creates its own DB session)
     
@@ -47,12 +47,18 @@ async def crawl_task(session_id: UUID, url: str, user_id: UUID):
             session.status = SessionStatus.PROCESSING
             db.commit()
         
-        # Check global cache first
-        cached_docs = GlobalDocumentService.find_cached_documents(
-            db=db,
-            base_url=url,
-            document_types=['privacy_policy', 'terms_of_service', 'privacy', 'tos']
-        )
+        # Check global cache first (unless force_refresh is True)
+        cached_docs = []
+        if not force_refresh:
+            cached_docs = GlobalDocumentService.find_cached_documents(
+                db=db,
+                base_url=url,
+                document_types=['privacy_policy', 'terms_of_service', 'privacy', 'tos']
+            )
+            if cached_docs:
+                logger.info(f"Found {len(cached_docs)} cached documents for {url} - using cache")
+        else:
+            logger.info(f"force_refresh=True: Bypassing global cache for {url} - will crawl fresh")
         
         document_count = 0
         analyzed_count = 0
@@ -319,7 +325,8 @@ async def start_crawl(
             crawl_task,
             session.id,
             str(request.url),
-            current_user.id
+            current_user.id,
+            request.force_refresh
         )
         
         return CrawlResponse(
