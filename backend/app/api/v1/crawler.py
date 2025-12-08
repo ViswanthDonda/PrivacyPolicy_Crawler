@@ -16,6 +16,7 @@ from app.schemas.crawler import (
 from app.schemas.analysis import AnalysisResponse, DocumentAnalysisResponse, SessionAnalysisResponse
 from app.database.base import get_db
 from app.services.crawler_service import CrawlerService
+from app.services.groq_service import GroqService
 from app.services.gemini_service import GeminiService
 from app.services.global_document_service import GlobalDocumentService
 from sqlalchemy.orm import Session
@@ -142,31 +143,123 @@ async def crawl_task(session_id: UUID, url: str, user_id: UUID):
         if cache_hit:
             logger.info(f"Using {len(cached_docs)} cached documents - saved crawling time")
         
-        # Analyze documents with Gemini
-        gemini_service = GeminiService()
+        # Analyze documents with Groq (Llama) as primary, Gemini as emergency backup only
+        groq_service = GroqService()
+        gemini_service = None  # Only initialize if absolutely necessary
+        
+        # Track Gemini usage to prevent quota exhaustion
+        gemini_usage_today = 0
+        MAX_GEMINI_USAGE_PER_DAY = 15  # Conservative limit (20/day max, keep 5 buffer)
+        
         for doc_info in documents_to_analyze:
             try:
-                # Run analysis
-                analysis_result = await gemini_service.analyze_document(
-                    text=doc_info['text'],
-                    url=doc_info['url'],
-                    doc_type=doc_info['doc_type']
-                )
+                # PRIMARY: Try Groq first
+                analysis_result = None
+                used_gemini = False
                 
-                # Store analysis
-                analysis = AnalysisResult(
-                    document_id=doc_info['document'].id,
-                    user_id=user_id,
-                    summary_100_words=analysis_result.get('summary_100_words', ''),
-                    summary_one_sentence=analysis_result.get('summary_one_sentence', ''),
-                    word_frequency=analysis_result.get('word_frequency', {}),
-                    measurements=analysis_result.get('measurements', {})
-                )
-                db.add(analysis)
-                analyzed_count += 1
+                try:
+                    logger.info(f"Attempting analysis with Groq (Llama) for {doc_info['url']}")
+                    analysis_result = await groq_service.analyze_document(
+                        text=doc_info['text'],
+                        url=doc_info['url'],
+                        doc_type=doc_info['doc_type']
+                    )
+                    logger.info(f"Successfully analyzed with Groq for {doc_info['url']}")
+                    
+                except Exception as groq_error:
+                    # Groq failed - check if we should use Gemini
+                    error_type = type(groq_error).__name__
+                    error_msg = str(groq_error).lower()
+                    
+                    # STRICT SAFEGUARDS: Only use Gemini in very specific cases
+                    should_use_gemini = False
+                    
+                    # Check 1: Is it a rate limit error? (429)
+                    if "429" in error_msg or "rate limit" in error_msg or "quota" in error_msg:
+                        logger.warning(f"Groq rate limit hit for {doc_info['url']}, considering Gemini fallback")
+                        should_use_gemini = True
+                    
+                    # Check 2: Is it a service unavailable error? (503)
+                    elif "503" in error_msg or "service unavailable" in error_msg or "unavailable" in error_msg:
+                        logger.warning(f"Groq service unavailable for {doc_info['url']}, considering Gemini fallback")
+                        should_use_gemini = True
+                    
+                    # Check 3: Is it a timeout error?
+                    elif "timeout" in error_msg or "timed out" in error_msg:
+                        logger.warning(f"Groq timeout for {doc_info['url']}, considering Gemini fallback")
+                        should_use_gemini = True
+                    
+                    # For all other errors (auth, invalid request, parsing, etc.), DO NOT use Gemini
+                    else:
+                        logger.error(f"Groq error (non-fallback type) for {doc_info['url']}: {groq_error}")
+                        logger.error(f"Error type: {error_type}, Message: {error_msg}")
+                        logger.error("NOT using Gemini fallback - this error type is not eligible for fallback")
+                        should_use_gemini = False
+                    
+                    # Check 4: Have we exceeded Gemini daily limit?
+                    if should_use_gemini and gemini_usage_today >= MAX_GEMINI_USAGE_PER_DAY:
+                        logger.error(f"Gemini daily limit reached ({gemini_usage_today}/{MAX_GEMINI_USAGE_PER_DAY}). NOT using Gemini fallback.")
+                        should_use_gemini = False
+                    
+                    # Check 5: Is Gemini API key configured?
+                    if should_use_gemini:
+                        from app.config import settings
+                        if not settings.GEMINI_API_KEY:
+                            logger.error("Gemini API key not configured. Cannot use Gemini fallback.")
+                            should_use_gemini = False
+                    
+                    # FINAL DECISION: Use Gemini only if all checks pass
+                    if should_use_gemini:
+                        logger.warning(f"⚠️  EMERGENCY FALLBACK: Using Gemini for {doc_info['url']} (Groq failed: {error_type})")
+                        
+                        # Initialize Gemini service only if needed
+                        if gemini_service is None:
+                            try:
+                                gemini_service = GeminiService()
+                            except Exception as gemini_init_error:
+                                logger.error(f"Failed to initialize Gemini service: {gemini_init_error}")
+                                raise groq_error  # Re-raise original Groq error
+                        
+                        # Try Gemini with error handling
+                        try:
+                            analysis_result = await gemini_service.analyze_document(
+                                text=doc_info['text'],
+                                url=doc_info['url'],
+                                doc_type=doc_info['doc_type']
+                            )
+                            gemini_usage_today += 1
+                            used_gemini = True
+                            logger.warning(f"⚠️  Gemini fallback successful for {doc_info['url']} (Usage: {gemini_usage_today}/{MAX_GEMINI_USAGE_PER_DAY})")
+                        except Exception as gemini_error:
+                            logger.error(f"Gemini fallback also failed for {doc_info['url']}: {gemini_error}")
+                            # Re-raise original Groq error, not Gemini error
+                            raise groq_error
+                    else:
+                        # Do not use Gemini - re-raise the original Groq error
+                        logger.error(f"Analysis failed for {doc_info['url']} - NOT using Gemini fallback")
+                        raise groq_error
+                
+                # Store analysis if we got a result
+                if analysis_result:
+                    analysis = AnalysisResult(
+                        document_id=doc_info['document'].id,
+                        user_id=user_id,
+                        summary_100_words=analysis_result.get('summary_100_words', ''),
+                        summary_one_sentence=analysis_result.get('summary_one_sentence', ''),
+                        word_frequency=analysis_result.get('word_frequency', {}),
+                        measurements=analysis_result.get('measurements', {})
+                    )
+                    db.add(analysis)
+                    analyzed_count += 1
+                    
+                    if used_gemini:
+                        logger.warning(f"⚠️  Document analyzed using Gemini fallback (should be rare!)")
+                else:
+                    logger.error(f"No analysis result for {doc_info['url']}")
                 
             except Exception as analysis_error:
                 logger.error(f"Error analyzing document {doc_info['url']}: {analysis_error}")
+                logger.error(f"Analysis failed completely - document will be stored without analysis")
                 # Continue with other documents even if one fails
         
         # Update session
