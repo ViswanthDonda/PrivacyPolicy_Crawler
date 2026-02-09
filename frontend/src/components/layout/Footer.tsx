@@ -20,30 +20,21 @@ const Footer: React.FC = () => {
     resources: [
       { name: 'Help Center', href: '/help' },
       { name: 'Contact', href: '/contact' }
-    ]
+    ] 
   }
 
   const socialLinks = [
     {
       name: 'GitHub',
-      href: 'https://github.com',
+      href: 'https://github.com/ViswanthDonda/PrivacyPolicy_Crawler',
       icon: <Github className="h-5 w-5" />
     },
-    {
-      name: 'Twitter',
-      href: 'https://twitter.com',
-      icon: <Twitter className="h-5 w-5" />
-    },
-    {
-      name: 'LinkedIn',
-      href: 'https://linkedin.com',
-      icon: <Linkedin className="h-5 w-5" />
-    },
-    {
+    
+    /* {
       name: 'Email',
       href: '#',
       icon: <Mail className="h-5 w-5" />
-    }
+    } */
   ]
 
   return (
@@ -80,7 +71,7 @@ const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Product Links */}
+         {/* Product Links */}
           <div>
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
               Product
@@ -96,7 +87,7 @@ const Footer: React.FC = () => {
                   </Link>
                 </li>
               ))}
-            </ul>
+            </ul> 
           </div>
 
           {/* Resources Links */}
