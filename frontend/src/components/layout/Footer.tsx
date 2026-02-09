@@ -1,12 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
-import { 
-  Github, 
-  Twitter, 
-  Linkedin, 
-  Mail,
-  ExternalLink
-} from 'lucide-react'
+import { Github, ExternalLink } from 'lucide-react'
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear()
@@ -15,41 +9,27 @@ const Footer: React.FC = () => {
     product: [
       { name: 'Features', href: '/features' },
       { name: 'Documentation', href: '/docs' }
-    ],
-    // Removed legal section per user request
-    resources: [
-      { name: 'Help Center', href: '/help' },
-      { name: 'Contact', href: '/contact' }
     ]
   }
 
   const socialLinks = [
     {
       name: 'GitHub',
-      href: 'https://github.com',
+      href: 'https://github.com/ViswanthDonda/PrivacyPolicy_Crawler',
       icon: <Github className="h-5 w-5" />
     },
-    {
-      name: 'Twitter',
-      href: 'https://twitter.com',
-      icon: <Twitter className="h-5 w-5" />
-    },
-    {
-      name: 'LinkedIn',
-      href: 'https://linkedin.com',
-      icon: <Linkedin className="h-5 w-5" />
-    },
-    {
+    
+    /* {
       name: 'Email',
       href: '#',
       icon: <Mail className="h-5 w-5" />
-    }
+    } */
   ]
 
   return (
     <footer className="bg-gray-900/80 backdrop-blur-sm border-t border-gray-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Brand */}
           <div className="lg:col-span-1">
             <div className="flex items-center space-x-2 mb-4">
@@ -80,7 +60,7 @@ const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Product Links */}
+         {/* Product Links */}
           <div>
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
               Product
@@ -96,26 +76,7 @@ const Footer: React.FC = () => {
                   </Link>
                 </li>
               ))}
-            </ul>
-          </div>
-
-          {/* Resources Links */}
-          <div>
-            <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
-              Resources
-            </h3>
-            <ul className="space-y-3">
-              {footerLinks.resources.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-gray-300 hover:text-white transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            </ul> 
           </div>
         </div>
 
@@ -128,7 +89,7 @@ const Footer: React.FC = () => {
             
             <div className="mt-4 md:mt-0 flex items-center space-x-6">
               <a
-                href="https://github.com"
+                href="https://github.com/ViswanthDonda/PrivacyPolicy_Crawler"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-gray-300 hover:text-white transition-colors flex items-center space-x-1"
