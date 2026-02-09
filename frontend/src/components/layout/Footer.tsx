@@ -89,7 +89,7 @@ const Footer: React.FC = () => {
             
             <div className="mt-4 md:mt-0 flex items-center space-x-6">
               <a
-                href="https://privacy-policy-crawler.vercel.app/"
+                href="https://github.com/ViswanthDonda/PrivacyPolicy_Crawler"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-gray-300 hover:text-white transition-colors flex items-center space-x-1"
